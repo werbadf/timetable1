@@ -1,0 +1,2422 @@
+<!DOCTYPE html>
+<html lang="ru" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TimeTable - Расписание занятий</title>
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+          },
+          animation: {
+            'spin-slow': 'spin 12s linear infinite',
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <!-- React 18 & ReactDOM 18 CDN -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  
+  <!-- Babel Standalone for JSX in browser -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(150, 150, 150, 0.3);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(150, 150, 150, 0.5);
+    }
+  </style>
+</head>
+<body class="bg-slate-50 dark:bg-[#0a0c10] text-slate-800 dark:text-zinc-100 transition-colors duration-300 font-sans selection:bg-indigo-500 selection:text-white">
+  
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useRef } = React;
+
+    // --- Embedded SVG Icons for maximum reliability & zero external icon CDN failures ---
+    const Icon = ({ name, className = "w-4 h-4" }) => {
+      const icons = {
+        sparkles: <path d="M12 3v3m0 12v3m9-9h-3M6 12H3m15.364-6.364-2.121 2.121M8.757 15.243l-2.121 2.121m12.728 0-2.121-2.121M8.757 8.757 6.636 6.636M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z" />,
+        sun: <path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72 1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z" />,
+        moon: <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />,
+        trending: <path d="m22 7-8.5 8.5-5-5L2 17m14-10h6v6" />,
+        checkCircle: <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14M22 4 12 14.01l-3-3" />,
+        calendar: <path d="M8 2v4m8-4v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" />,
+        award: <path d="m15.477 12.89 1.515 8.526a.5.5 0 0 1-.747.512L12 19.645l-4.245 2.283a.5.5 0 0 1-.747-.512l1.515-8.526a6 6 0 1 1 6.954 0Z" />,
+        clock: <path d="M12 6v6l4 2m6-2a10 10 0 1 1-20 0 10 10 0 0 1 20 0Z" />,
+        headphones: <path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3" />,
+        flame: <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />,
+        zap: <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />,
+        coffee: <path d="M17 8h1a4 4 0 1 1 0 8h-1M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z M6 2v2m4-2v2m4-2v2" />,
+        plus: <path d="M5 12h14m-7-7v14" />,
+        trash: <path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />,
+        edit: <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />,
+        play: <polygon points="6 3 20 12 6 21 6 3" />,
+        pause: <path d="M6 4h4v16H6zm8 0h4v16h-4z" />,
+        rotate: <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8m0-5v5h5" />,
+        book: <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z M6 2v20" />,
+        external: <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6m4-3h6v6m-11 5L21 3" />,
+        grid: (
+          <g>
+            <rect width="7" height="7" x="3" y="3" rx="1" />
+            <rect width="7" height="7" x="14" y="3" rx="1" />
+            <rect width="7" height="7" x="14" y="14" rx="1" />
+            <rect width="7" height="7" x="3" y="14" rx="1" />
+          </g>
+        ),
+        list: <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />,
+        x: <path d="M18 6 6 18M6 6l12 12" />,
+        check: <polyline points="20 6 9 17 4 12" />,
+        volume: <path d="M11 5L6 9H2v6h4l5 4V5zm4.54 3.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14" />,
+        volumeX: <path d="M11 5L6 9H2v6h4l5 4V5zm12 4l-6 6m0-6l6 6" />,
+        barChart: <path d="M12 20V10m6 10V4M6 20v-4" />,
+        info: (
+          <g>
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 16v-4m0-4h.01" />
+          </g>
+        )
+      };
+
+      return (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={className}
+        >
+          {icons[name] || icons.sparkles}
+        </svg>
+      );
+    };
+
+    const toDateKey = (date) => {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    };
+
+    const formatDateRu = (dateStr) => {
+      if (!dateStr) return '';
+      const [y, m, d] = dateStr.split('-').map(Number);
+      const date = new Date(y, m - 1, d);
+      return date.toLocaleDateString('ru-RU', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short'
+      });
+    };
+
+    const formatDateFullRu = (dateStr) => {
+      if (!dateStr) return '';
+      const [y, m, d] = dateStr.split('-').map(Number);
+      const date = new Date(y, m - 1, d);
+      return date.toLocaleDateString('ru-RU', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+      });
+    };
+
+    // Определение типа и длительности перемены перед уроком
+    const getBreakText = (currentCls, prevCls) => {
+      if (currentCls.breakType && currentCls.breakType !== 'auto') {
+        if (currentCls.breakType === 'none') return null;
+        return currentCls.breakType;
+      }
+      if (!prevCls || !prevCls.time || !currentCls.time) return null;
+      try {
+        const prevParts = prevCls.time.split('-').map(s => s.trim());
+        const currParts = currentCls.time.split('-').map(s => s.trim());
+        if (prevParts.length < 2 || currParts.length < 1) return null;
+        const [ph, pm] = prevParts[1].split(':').map(Number);
+        const [ch, cm] = currParts[0].split(':').map(Number);
+        if (isNaN(ph) || isNaN(pm) || isNaN(ch) || isNaN(cm)) return null;
+        const prevEndMin = ph * 60 + pm;
+        const currStartMin = ch * 60 + cm;
+        const diff = currStartMin - prevEndMin;
+        if (diff <= 0) return null;
+        if (diff >= 20) {
+          return `Большая перемена: ${diff} мин`;
+        } else {
+          return `Маленькая перемена: ${diff} мин`;
+        }
+      } catch (e) {
+        return null;
+      }
+    };
+
+    // Clean initial states without mock demo data
+    const INITIAL_ACTIVITY = {};
+
+    const INITIAL_SCHEDULE = {
+      'Пн': [],
+      'Вт': [],
+      'Ср': [],
+      'Чт': [],
+      'Пт': [],
+      'Сб': []
+    };
+
+    const INITIAL_TASKS = [];
+
+    const INITIAL_SUBJECTS = [];
+
+    function App() {
+      const [darkMode, setDarkMode] = useState(() => {
+        const saved = localStorage.getItem('studyflow_v3_theme');
+        return saved !== null ? JSON.parse(saved) : true;
+      });
+
+      // Default tab is now Tasks (with Activity moved to the very end)
+      const [activeTab, setActiveTab] = useState('tasks');
+      const [selectedDay, setSelectedDay] = useState('Пн');
+
+      const [schedule, setSchedule] = useState(() => {
+        const saved = localStorage.getItem('studyflow_v3_schedule');
+        return saved ? JSON.parse(saved) : INITIAL_SCHEDULE;
+      });
+
+      const [tasks, setTasks] = useState(() => {
+        const saved = localStorage.getItem('studyflow_v3_tasks');
+        return saved ? JSON.parse(saved) : INITIAL_TASKS;
+      });
+
+      const [subjects, setSubjects] = useState(() => {
+        const saved = localStorage.getItem('studyflow_v3_subjects');
+        return saved ? JSON.parse(saved) : INITIAL_SUBJECTS;
+      });
+
+      const [activityLog, setActivityLog] = useState(() => {
+        const saved = localStorage.getItem('studyflow_v3_activity');
+        return saved ? JSON.parse(saved) : INITIAL_ACTIVITY;
+      });
+
+      // View & Filter States
+      const [taskViewMode, setTaskViewMode] = useState('kanban');
+      const [taskFilterPriority, setTaskFilterPriority] = useState('all');
+      const [taskSearch, setTaskSearch] = useState('');
+      
+      // Modals
+      const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+      const [editingTask, setEditingTask] = useState(null);
+      const [isClassModalOpen, setIsClassModalOpen] = useState(false);
+      const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false);
+      const [selectedTextbookDuty, setSelectedTextbookDuty] = useState('Оба');
+      
+      // Activity Day Details Modal
+      const [selectedDateForDetails, setSelectedDateForDetails] = useState(null);
+      const [manualActivityTitle, setManualActivityTitle] = useState('');
+
+      // Toast State
+      const [toastMessage, setToastMessage] = useState(null);
+
+      // Zen Pomodoro State
+      const [zenOpen, setZenOpen] = useState(false);
+      const [pomodoroTime, setPomodoroTime] = useState(25 * 60);
+      const [isTimerRunning, setIsTimerRunning] = useState(false);
+      const [timerMode, setTimerMode] = useState('work');
+      const [zenTask, setZenTask] = useState(null);
+      const [ambientSound, setAmbientSound] = useState(false);
+
+      const audioCtxRef = useRef(null);
+      const noiseSourceRef = useRef(null);
+
+      useEffect(() => {
+        localStorage.setItem('studyflow_v3_theme', JSON.stringify(darkMode));
+        if (darkMode) {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      }, [darkMode]);
+
+      useEffect(() => {
+        localStorage.setItem('studyflow_v3_schedule', JSON.stringify(schedule));
+      }, [schedule]);
+
+      useEffect(() => {
+        localStorage.setItem('studyflow_v3_tasks', JSON.stringify(tasks));
+      }, [tasks]);
+
+      useEffect(() => {
+        localStorage.setItem('studyflow_v3_subjects', JSON.stringify(subjects));
+      }, [subjects]);
+
+      useEffect(() => {
+        localStorage.setItem('studyflow_v3_activity', JSON.stringify(activityLog));
+      }, [activityLog]);
+
+      const showToast = (msg) => {
+        setToastMessage(msg);
+        setTimeout(() => setToastMessage(null), 3200);
+      };
+
+      // Procedural Rain Sound generator via Web Audio API
+      const toggleAmbientSound = () => {
+        if (!ambientSound) {
+          try {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            const ctx = new AudioCtx();
+            audioCtxRef.current = ctx;
+
+            const bufferSize = ctx.sampleRate * 2;
+            const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+            const output = noiseBuffer.getChannelData(0);
+            let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+
+            for (let i = 0; i < bufferSize; i++) {
+              const white = Math.random() * 2 - 1;
+              b0 = 0.99886 * b0 + white * 0.0555179;
+              b1 = 0.99332 * b1 + white * 0.0750759;
+              b2 = 0.96900 * b2 + white * 0.1538520;
+              b3 = 0.86650 * b3 + white * 0.3104856;
+              b4 = 0.55000 * b4 + white * 0.5329522;
+              b5 = -0.7616 * b5 - white * 0.0168980;
+              output[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.045;
+              b6 = white * 0.115926;
+            }
+
+            const whiteNoise = ctx.createBufferSource();
+            whiteNoise.buffer = noiseBuffer;
+            whiteNoise.loop = true;
+
+            const filter = ctx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(750, ctx.currentTime);
+
+            const gainNode = ctx.createGain();
+            gainNode.gain.setValueAtTime(0.35, ctx.currentTime);
+
+            whiteNoise.connect(filter);
+            filter.connect(gainNode);
+            gainNode.connect(ctx.destination);
+
+            whiteNoise.start();
+            noiseSourceRef.current = { ctx, whiteNoise, gainNode };
+            setAmbientSound(true);
+            showToast('🌧️ Эмбиент дождя включен');
+          } catch (e) {
+            showToast('Аудио недоступно в этом браузере');
+          }
+        } else {
+          if (noiseSourceRef.current) {
+            try {
+              noiseSourceRef.current.whiteNoise.stop();
+              noiseSourceRef.current.ctx.close();
+            } catch (e) {}
+          }
+          setAmbientSound(false);
+          showToast('Эмбиент звук выключен');
+        }
+      };
+
+      // Pomodoro Timer Effect
+      useEffect(() => {
+        let interval = null;
+        if (isTimerRunning && pomodoroTime > 0) {
+          interval = setInterval(() => {
+            setPomodoroTime(prev => prev - 1);
+          }, 1000);
+        } else if (pomodoroTime === 0) {
+          if (timerMode === 'work') {
+            setTimerMode('break');
+            setPomodoroTime(5 * 60);
+            showToast('🎉 Спринт завершен! Перерыв 5 минут.');
+          } else {
+            setTimerMode('work');
+            setPomodoroTime(25 * 60);
+            showToast('💪 Время возвращаться к учебе!');
+          }
+          setIsTimerRunning(false);
+        }
+        return () => clearInterval(interval);
+      }, [isTimerRunning, pomodoroTime, timerMode]);
+
+      // Dynamic synchronization: Status Change -> Activity Map Update
+      const handleTaskStatusChange = (taskId, newStatus) => {
+        const todayKey = toDateKey(new Date());
+        const currentTask = tasks.find(t => t.id === taskId);
+        const wasDone = currentTask?.status === 'done';
+        const isNowDone = newStatus === 'done';
+
+        setTasks(prev =>
+          prev.map(t => {
+            if (t.id === taskId) {
+              return {
+                ...t,
+                status: newStatus,
+                completedDate: isNowDone ? todayKey : null
+              };
+            }
+            return t;
+          })
+        );
+
+        if (!wasDone && isNowDone) {
+          const timeStr = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+          setActivityLog(prev => {
+            const todayData = prev[todayKey] || { count: 0, items: [] };
+            const updatedItems = [
+              {
+                id: 'act_' + Date.now(),
+                title: currentTask.title,
+                time: timeStr,
+                type: 'task'
+              },
+              ...todayData.items
+            ];
+            return {
+              ...prev,
+              [todayKey]: {
+                count: todayData.count + 1,
+                items: updatedItems
+              }
+            };
+          });
+          showToast('🌟 Задание сдано! Продуктивность за сегодня обновлена!');
+        }
+      };
+
+      const handleAddManualActivity = (dateKey) => {
+        if (!manualActivityTitle.trim()) return;
+        const timeStr = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+
+        setActivityLog(prev => {
+          const dayData = prev[dateKey] || { count: 0, items: [] };
+          const updatedItems = [
+            {
+              id: 'manual_' + Date.now(),
+              title: manualActivityTitle.trim(),
+              time: timeStr,
+              type: 'manual'
+            },
+            ...dayData.items
+          ];
+          return {
+            ...prev,
+            [dateKey]: {
+              count: dayData.count + 1,
+              items: updatedItems
+            }
+          };
+        });
+
+        setManualActivityTitle('');
+        showToast('✨ Продуктивность дня увеличена!');
+      };
+
+      const handleDeleteActivityItem = (dateKey, itemId) => {
+        setActivityLog(prev => {
+          const dayData = prev[dateKey];
+          if (!dayData) return prev;
+          const updatedItems = dayData.items.filter(i => i.id !== itemId);
+          const newCount = Math.max(0, dayData.count - 1);
+
+          if (newCount === 0 && updatedItems.length === 0) {
+            const copy = { ...prev };
+            delete copy[dateKey];
+            return copy;
+          }
+
+          return {
+            ...prev,
+            [dateKey]: {
+              count: newCount,
+              items: updatedItems
+            }
+          };
+        });
+      };
+
+      const handleDeleteTask = (taskId) => {
+        setTasks(prev => prev.filter(t => t.id !== taskId));
+        showToast('Задание удалено');
+      };
+
+      const handleSaveTask = (taskData) => {
+        if (editingTask) {
+          setTasks(prev => prev.map(t => (t.id === editingTask.id ? { ...taskData, id: t.id } : t)));
+          showToast('Задание сохранено');
+        } else {
+          const newTask = {
+            ...taskData,
+            id: 't_' + Date.now(),
+            status: 'todo',
+            completedDate: null
+          };
+          setTasks(prev => [newTask, ...prev]);
+          showToast('Задание добавлено');
+        }
+        setIsTaskModalOpen(false);
+        setEditingTask(null);
+      };
+
+      const handleAddClass = (classData) => {
+        const newClass = {
+          ...classData,
+          id: 'c_' + Date.now()
+        };
+        setSchedule(prev => ({
+          ...prev,
+          [selectedDay]: [...(prev[selectedDay] || []), newClass]
+        }));
+        setIsClassModalOpen(false);
+        showToast('Урок добавлен в расписание');
+      };
+
+      const handleDeleteClass = (day, classId) => {
+        setSchedule(prev => ({
+          ...prev,
+          [day]: prev[day].filter(c => c.id !== classId)
+        }));
+        showToast('Урок удален');
+      };
+
+      const getTextbookBadge = (duty) => {
+        switch (duty) {
+          case 'Рома':
+            return (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-sky-500/15 text-sky-500 dark:text-sky-300 border border-sky-500/30 shadow-sm">
+                <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse"></span>
+                <span>Учебник: Рома</span>
+              </span>
+            );
+          case 'Ермолай':
+            return (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-amber-500/15 text-amber-500 dark:text-amber-300 border border-amber-500/30 shadow-sm">
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                <span>Учебник: Ермолай</span>
+              </span>
+            );
+          case 'Оба':
+            return (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-violet-500/15 text-violet-500 dark:text-violet-300 border border-violet-500/30 shadow-sm">
+                <span className="w-2 h-2 rounded-full bg-violet-400 animate-pulse"></span>
+                <span>Учебник: Оба</span>
+              </span>
+            );
+          case 'Без учебника':
+          default:
+            return (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700/60 shadow-xs">
+                Без учебника
+              </span>
+            );
+        }
+      };
+
+      const handleAddSubject = (subjectData) => {
+        const newSubject = {
+          id: 'sub_' + Date.now(),
+          name: subjectData.name.trim(),
+          targetGrade: parseFloat(subjectData.targetGrade) || 4.75,
+          grades: [],
+          resources: []
+        };
+        setSubjects(prev => [...prev, newSubject]);
+        setIsSubjectModalOpen(false);
+        showToast('Предмет добавлен');
+      };
+
+      const handleDeleteSubject = (subjectId) => {
+        setSubjects(prev => prev.filter(s => s.id !== subjectId));
+        showToast('Предмет удален');
+      };
+
+      const handleAddGrade = (subjectId, gradeValue) => {
+        setSubjects(prev =>
+          prev.map(sub => {
+            if (sub.id === subjectId) {
+              return { ...sub, grades: [...sub.grades, gradeValue] };
+            }
+            return sub;
+          })
+        );
+        showToast(`Оценка +${gradeValue} сохранена`);
+      };
+
+      const handleRemoveLastGrade = (subjectId) => {
+        setSubjects(prev =>
+          prev.map(sub => {
+            if (sub.id === subjectId && sub.grades.length > 0) {
+              return { ...sub, grades: sub.grades.slice(0, -1) };
+            }
+            return sub;
+          })
+        );
+      };
+
+      const handleAddResource = (subjectId, title, url) => {
+        if (!title || !url) return;
+        setSubjects(prev =>
+          prev.map(sub => {
+            if (sub.id === subjectId) {
+              return {
+                ...sub,
+                resources: [...sub.resources, { id: 'r_' + Date.now(), title, url }]
+              };
+            }
+            return sub;
+          })
+        );
+        showToast('Ресурс прикреплен');
+      };
+
+      const calculateNeededFives = (grades, target) => {
+        if (!grades || grades.length === 0) return 0;
+        const currentSum = grades.reduce((a, b) => a + b, 0);
+        const count = grades.length;
+        const currentAvg = currentSum / count;
+        if (currentAvg >= target) return 0;
+        if (target >= 5) return 'Требуется ровно 5.0 (недостижимо с текущими оценками)';
+
+        const needed = Math.ceil((target * count - currentSum) / (5 - target));
+        return needed > 0 ? needed : 0;
+      };
+
+      const filteredTasks = useMemo(() => {
+        return tasks.filter(t => {
+          const matchesPriority = taskFilterPriority === 'all' || t.priority === taskFilterPriority;
+          const matchesSearch =
+            t.title.toLowerCase().includes(taskSearch.toLowerCase()) ||
+            t.subject.toLowerCase().includes(taskSearch.toLowerCase()) ||
+            t.format.toLowerCase().includes(taskSearch.toLowerCase());
+          return matchesPriority && matchesSearch;
+        });
+      }, [tasks, taskFilterPriority, taskSearch]);
+
+      const kanbanColumns = [
+        { id: 'todo', title: 'К выполнению', badgeColor: 'bg-zinc-500/20 text-zinc-400' },
+        { id: 'in_progress', title: 'В процессе', badgeColor: 'bg-amber-500/20 text-amber-400' },
+        { id: 'done', title: 'Сдано / Готово', badgeColor: 'bg-emerald-500/20 text-emerald-400' },
+      ];
+
+      // Live Class Countdown
+      const currentClassInfo = useMemo(() => {
+        const dayNames = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+        const todayIndex = new Date().getDay();
+        const todayCode = dayNames[todayIndex] || 'Пн';
+        const todayClasses = schedule[todayCode] || [];
+
+        if (todayClasses.length === 0) {
+          return { status: 'none', message: 'На сегодня уроков нет, отличный день для отдыха и саморазвития!' };
+        }
+
+        const now = new Date();
+        const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+        for (let i = 0; i < todayClasses.length; i++) {
+          const c = todayClasses[i];
+          const [start, end] = c.time.split('-').map(s => s.trim());
+          if (start && end) {
+            const [sh, sm] = start.split(':').map(Number);
+            const [eh, em] = end.split(':').map(Number);
+            const startMin = sh * 60 + sm;
+            const endMin = eh * 60 + em;
+
+            if (nowMinutes >= startMin && nowMinutes <= endMin) {
+              const left = endMin - nowMinutes;
+              return { status: 'active', classItem: c, minutesLeft: left };
+            }
+
+            // Отслеживание текущей перемены между уроками
+            if (i < todayClasses.length - 1) {
+              const nextClass = todayClasses[i + 1];
+              const [nextStart] = nextClass.time.split('-').map(s => s.trim());
+              if (nextStart) {
+                const [nsh, nsm] = nextStart.split(':').map(Number);
+                const nextStartMin = nsh * 60 + nsm;
+                if (nowMinutes > endMin && nowMinutes < nextStartMin) {
+                  const breakLeft = nextStartMin - nowMinutes;
+                  const totalBreak = nextStartMin - endMin;
+                  const label = totalBreak >= 20 ? 'Большая перемена' : 'Маленькая перемена';
+                  return {
+                    status: 'break',
+                    message: `Сейчас ${label} (${totalBreak} мин). До следующего урока (${nextClass.name}): ${breakLeft} мин`
+                  };
+                }
+              }
+            }
+          }
+        }
+
+        return { status: 'break', message: 'Сейчас перемена или уроки на сегодня завершились' };
+      }, [schedule]);
+
+      // 18-Week Heatmap Generator
+      const heatmapData = useMemo(() => {
+        const weeksCount = 18;
+        const totalDays = weeksCount * 7;
+        const today = new Date();
+        const dayOfWeek = (today.getDay() + 6) % 7; 
+        
+        const startDate = new Date(today);
+        startDate.setDate(today.getDate() - dayOfWeek - (weeksCount - 1) * 7);
+
+        const weeks = [];
+        let currentWeek = [];
+        const monthHeaders = [];
+        let lastMonth = -1;
+
+        for (let i = 0; i < totalDays; i++) {
+          const d = new Date(startDate);
+          d.setDate(startDate.getDate() + i);
+          const key = toDateKey(d);
+          const isFuture = d > today;
+          const count = activityLog[key]?.count || 0;
+
+          if (d.getDay() === 1) {
+            const m = d.getMonth();
+            if (m !== lastMonth) {
+              monthHeaders.push({
+                weekIndex: weeks.length,
+                title: d.toLocaleDateString('ru-RU', { month: 'short' })
+              });
+              lastMonth = m;
+            }
+          }
+
+          currentWeek.push({
+            date: d,
+            dateKey: key,
+            count,
+            isFuture,
+            isToday: key === toDateKey(today)
+          });
+
+          if (currentWeek.length === 7) {
+            weeks.push(currentWeek);
+            currentWeek = [];
+          }
+        }
+
+        return { weeks, monthHeaders };
+      }, [activityLog]);
+
+      // Analytics calculation
+      const productivityStats = useMemo(() => {
+        const today = new Date();
+        const todayKey = toDateKey(today);
+
+        let currentStreak = 0;
+        let checkDate = new Date(today);
+        const hasToday = (activityLog[todayKey]?.count || 0) > 0;
+        if (!hasToday) checkDate.setDate(checkDate.getDate() - 1);
+
+        while (true) {
+          const k = toDateKey(checkDate);
+          if ((activityLog[k]?.count || 0) > 0) {
+            currentStreak++;
+            checkDate.setDate(checkDate.getDate() - 1);
+          } else {
+            break;
+          }
+        }
+
+        const allDates = Object.keys(activityLog).sort();
+        let recordStreak = 0;
+        let tempStreak = 0;
+        let prevD = null;
+
+        allDates.forEach(k => {
+          const [y, m, d] = k.split('-').map(Number);
+          const currentD = new Date(y, m - 1, d);
+          if (prevD) {
+            const diffDays = Math.round((currentD - prevD) / (1000 * 60 * 60 * 24));
+            if (diffDays === 1) tempStreak++;
+            else tempStreak = 1;
+          } else {
+            tempStreak = 1;
+          }
+          if (tempStreak > recordStreak) recordStreak = tempStreak;
+          prevD = currentD;
+        });
+
+        if (currentStreak > recordStreak) recordStreak = currentStreak;
+
+        let totalAllTime = 0;
+        let thisWeekCount = 0;
+        
+        const monday = new Date(today);
+        monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+        monday.setHours(0, 0, 0, 0);
+
+        Object.entries(activityLog).forEach(([k, data]) => {
+          totalAllTime += data.count;
+          const [y, m, d] = k.split('-').map(Number);
+          const dateObj = new Date(y, m - 1, d);
+          if (dateObj >= monday && dateObj <= today) {
+            thisWeekCount += data.count;
+          }
+        });
+
+        const weekdayTotals = [0, 0, 0, 0, 0, 0, 0];
+        const weekdayCounts = [0, 0, 0, 0, 0, 0, 0];
+        const weekdayNames = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
+
+        Object.entries(activityLog).forEach(([k, data]) => {
+          const [y, m, d] = k.split('-').map(Number);
+          const dateObj = new Date(y, m - 1, d);
+          const dow = dateObj.getDay();
+          weekdayTotals[dow] += data.count;
+          weekdayCounts[dow]++;
+        });
+
+        let bestDow = 2;
+        let bestAvg = 0;
+        for (let i = 0; i < 7; i++) {
+          const avg = weekdayCounts[i] > 0 ? weekdayTotals[i] / weekdayCounts[i] : 0;
+          if (avg > bestAvg) {
+            bestAvg = avg;
+            bestDow = i;
+          }
+        }
+
+        return {
+          currentStreak,
+          recordStreak: recordStreak || 0,
+          totalAllTime,
+          thisWeekCount,
+          bestDayText: bestAvg > 0 ? `${weekdayNames[bestDow]} (~${bestAvg.toFixed(1)} зад./день)` : 'Начните закрывать задачи'
+        };
+      }, [activityLog]);
+
+      const getCellColor = (count, isFuture, isToday) => {
+        if (isFuture) return 'bg-zinc-100/50 dark:bg-zinc-900/30 border border-transparent opacity-30 cursor-not-allowed';
+        if (count === 0) {
+          return isToday
+            ? 'bg-zinc-100 dark:bg-zinc-800/90 border-2 border-indigo-500/70 hover:border-indigo-400'
+            : 'bg-zinc-100/90 dark:bg-zinc-800/50 border border-zinc-200/60 dark:border-zinc-700/40 hover:border-zinc-400 dark:hover:border-zinc-500';
+        }
+        if (count === 1) return 'bg-emerald-300 dark:bg-emerald-900/90 border border-emerald-400 dark:border-emerald-700/80 hover:brightness-110';
+        if (count === 2) return 'bg-emerald-400 dark:bg-emerald-700 border border-emerald-500 dark:border-emerald-500 hover:brightness-110';
+        if (count === 3) return 'bg-emerald-500 dark:bg-emerald-500 border border-emerald-400 shadow-sm shadow-emerald-500/30 hover:brightness-110';
+        return 'bg-emerald-400 dark:bg-emerald-400 border-2 border-emerald-300 dark:border-emerald-200 shadow-md shadow-emerald-400/50 hover:brightness-125';
+      };
+
+      const getPriorityBadge = (priority) => {
+        switch (priority) {
+          case 'high':
+            return (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-500/15 text-rose-500 dark:text-rose-400 border border-rose-500/30">
+                <Icon name="flame" className="w-3 h-3 text-rose-500 animate-pulse" /> Высокий
+              </span>
+            );
+          case 'medium':
+            return (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-500 dark:text-amber-400 border border-amber-500/30">
+                <Icon name="zap" className="w-3 h-3 text-amber-500" /> Средний
+              </span>
+            );
+          default:
+            return (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-500/15 text-blue-500 dark:text-blue-400 border border-blue-500/30">
+                <Icon name="coffee" className="w-3 h-3 text-blue-500" /> Низкий
+              </span>
+            );
+        }
+      };
+
+      const formatTimer = (seconds) => {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+      };
+
+      return (
+        <div className="min-h-screen">
+          
+          {/* Toast Notification */}
+          {toastMessage && (
+            <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 rounded-2xl bg-indigo-600 text-white shadow-2xl shadow-indigo-600/40 text-sm font-medium animate-bounce border border-indigo-400/40">
+              <Icon name="sparkles" className="w-4 h-4 text-amber-300" />
+              <span>{toastMessage}</span>
+            </div>
+          )}
+
+          {/* Navigation Header */}
+          <header className="sticky top-0 z-40 backdrop-blur-xl border-b border-zinc-200/80 dark:border-zinc-800/80 bg-white/80 dark:bg-[#0a0c10]/80 px-4 lg:px-8 py-3.5 transition-colors">
+            <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+              
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-violet-600 via-indigo-600 to-cyan-400 flex items-center justify-center text-white shadow-lg shadow-indigo-500/25">
+                  <Icon name="sparkles" className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl font-black tracking-tight bg-gradient-to-r from-violet-400 via-indigo-400 to-cyan-400 bg-clip-text text-transparent">
+                      StudyFlow
+                    </span>
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                      PRO
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Navigation Tabs */}
+              <nav className="flex items-center gap-1 sm:gap-1.5 p-1 rounded-2xl bg-zinc-100 dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 text-sm font-medium">
+                {/* 1. ДОМАШКА */}
+                <button
+                  onClick={() => setActiveTab('tasks')}
+                  className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl transition-all ${
+                    activeTab === 'tasks'
+                      ? 'bg-white dark:bg-zinc-800 text-indigo-600 dark:text-indigo-400 shadow-md font-bold'
+                      : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'
+                  }`}
+                >
+                  <Icon name="checkCircle" className="w-4 h-4 text-indigo-500" />
+                  <span className="hidden sm:inline">Домашка</span>
+                </button>
+
+                {/* 2. РАСПИСАНИЕ */}
+                <button
+                  onClick={() => setActiveTab('schedule')}
+                  className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl transition-all ${
+                    activeTab === 'schedule'
+                      ? 'bg-white dark:bg-zinc-800 text-indigo-600 dark:text-indigo-400 shadow-md font-bold'
+                      : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'
+                  }`}
+                >
+                  <Icon name="calendar" className="w-4 h-4 text-violet-500" />
+                  <span className="hidden sm:inline">Расписание</span>
+                </button>
+
+                {/* 3. УСПЕВАЕМОСТЬ */}
+                <button
+                  onClick={() => setActiveTab('grades')}
+                  className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl transition-all ${
+                    activeTab === 'grades'
+                      ? 'bg-white dark:bg-zinc-800 text-indigo-600 dark:text-indigo-400 shadow-md font-bold'
+                      : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'
+                  }`}
+                >
+                  <Icon name="award" className="w-4 h-4 text-amber-500" />
+                  <span className="hidden sm:inline">Успеваемость</span>
+                </button>
+
+                {/* 4. АКТИВНОСТЬ (ТЕПЕРЬ ПОСЛЕДНЯЯ ВКЛАДКА) */}
+                <button
+                  onClick={() => setActiveTab('analytics')}
+                  className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl transition-all ${
+                    activeTab === 'analytics'
+                      ? 'bg-white dark:bg-zinc-800 text-indigo-600 dark:text-indigo-400 shadow-md font-bold'
+                      : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'
+                  }`}
+                >
+                  <Icon name="trending" className="w-4 h-4 text-emerald-500" />
+                  <span className="hidden sm:inline">Активность</span>
+                </button>
+              </nav>
+
+              {/* Theme & Zen Action Buttons */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setZenOpen(true);
+                    if (!zenTask && tasks.length > 0) setZenTask(tasks[0]);
+                  }}
+                  className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-xs sm:text-sm font-bold shadow-md shadow-indigo-600/30 transition-all active:scale-95"
+                >
+                  <Icon name="headphones" className="w-4 h-4" />
+                  <span className="hidden md:inline">Дзен-режим</span>
+                </button>
+
+                <button
+                  onClick={() => setDarkMode(!darkMode)}
+                  className="p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 hover:scale-105 transition-all shadow-sm"
+                  title="Сменить тему оформления"
+                >
+                  {darkMode ? <Icon name="sun" className="w-4 h-4 text-amber-400" /> : <Icon name="moon" className="w-4 h-4 text-indigo-600" />}
+                </button>
+              </div>
+            </div>
+          </header>
+
+          {/* Current Class Live Bar */}
+          <div className="max-w-7xl mx-auto px-4 lg:px-8 mt-5">
+            <div className="relative overflow-hidden rounded-2xl border border-indigo-500/30 bg-gradient-to-r from-indigo-950/40 via-purple-950/20 to-zinc-900/50 dark:bg-zinc-900/60 backdrop-blur-md p-4 lg:p-4.5 shadow-md">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
+                    <Icon name="clock" className="w-4 h-4 animate-spin-slow" />
+                  </div>
+                  <div>
+                    <div className="text-[11px] uppercase tracking-wider font-bold text-indigo-400">
+                      {currentClassInfo.status === 'active' ? 'Идет урок прямо сейчас' : 'Текущий статус уроков'}
+                    </div>
+                    {currentClassInfo.status === 'active' ? (
+                      <div className="text-sm sm:text-base font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                        <span>{currentClassInfo.classItem.name}</span>
+                        {currentClassInfo.classItem.textbookDuty && currentClassInfo.classItem.textbookDuty !== 'Без учебника' ? (
+                          <span className="text-xs font-semibold px-2 py-0.5 rounded-lg bg-indigo-500/20 text-indigo-300">
+                            Учебник: {currentClassInfo.classItem.textbookDuty}
+                          </span>
+                        ) : (
+                          <span className="text-xs font-medium px-2 py-0.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700/60">
+                            Без учебника
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-xs sm:text-sm font-medium text-zinc-600 dark:text-zinc-300">
+                        {currentClassInfo.message}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {currentClassInfo.status === 'active' && (
+                  <div className="flex items-center gap-3">
+                    <div className="px-3 py-1 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-xs font-bold">
+                      До звонка: <span className="text-white font-extrabold">{currentClassInfo.minutesLeft} мин</span>
+                    </div>
+                    <button
+                      onClick={() => setActiveTab('schedule')}
+                      className="text-xs text-indigo-400 hover:text-indigo-300 underline font-semibold"
+                    >
+                      Сетка уроков →
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <main className="max-w-7xl mx-auto px-4 lg:px-8 py-6">
+            
+            {/* TAB 1: TASKS & HOMEWORK */}
+            {activeTab === 'tasks' && (
+              <div className="space-y-6">
+                
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div>
+                    <h1 className="text-2xl font-black tracking-tight text-zinc-900 dark:text-white">
+                      Домашние задания и дедлайны
+                    </h1>
+                    <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">
+                      Смена статуса задания автоматически обновляет стрик продуктивности
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <input
+                      type="text"
+                      placeholder="Поиск..."
+                      value={taskSearch}
+                      onChange={(e) => setTaskSearch(e.target.value)}
+                      className="px-3 py-1.5 text-xs sm:text-sm rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+
+                    <select
+                      value={taskFilterPriority}
+                      onChange={(e) => setTaskFilterPriority(e.target.value)}
+                      className="px-3 py-1.5 text-xs sm:text-sm rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 focus:outline-none"
+                    >
+                      <option value="all">Все приоритеты</option>
+                      <option value="high">🔥 Высокий</option>
+                      <option value="medium">⚡ Средний</option>
+                      <option value="low">☕ Низкий</option>
+                    </select>
+
+                    <div className="flex items-center p-1 rounded-xl bg-zinc-200/70 dark:bg-zinc-800/80 border border-zinc-300 dark:border-zinc-700">
+                      <button
+                        onClick={() => setTaskViewMode('kanban')}
+                        className={`p-1.5 rounded-lg transition-all ${
+                          taskViewMode === 'kanban' ? 'bg-white dark:bg-zinc-900 text-indigo-500 shadow-sm' : 'text-zinc-400'
+                        }`}
+                        title="Канбан-доска"
+                      >
+                        <Icon name="grid" className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setTaskViewMode('list')}
+                        className={`p-1.5 rounded-lg transition-all ${
+                          taskViewMode === 'list' ? 'bg-white dark:bg-zinc-900 text-indigo-500 shadow-sm' : 'text-zinc-400'
+                        }`}
+                        title="Табличный вид"
+                      >
+                        <Icon name="list" className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setEditingTask(null);
+                        setIsTaskModalOpen(true);
+                      }}
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-bold shadow-md shadow-indigo-600/30 transition-all active:scale-95"
+                    >
+                      <Icon name="plus" className="w-4 h-4" />
+                      <span>Добавить ДЗ</span>
+                    </button>
+                  </div>
+                </div>
+
+                {tasks.length === 0 ? (
+                  <div className="py-16 flex flex-col items-center justify-center text-center p-6 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl bg-white/40 dark:bg-zinc-900/40">
+                    <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-500 mb-3">
+                      <Icon name="checkCircle" className="w-6 h-6" />
+                    </div>
+                    <h4 className="text-base font-bold text-zinc-800 dark:text-zinc-200 mb-1">Список заданий пуст</h4>
+                    <p className="text-xs text-zinc-400 max-w-sm mb-4">
+                      Создайте свое первое домашнее задание с дедлайном, приоритетом и форматом сдачи.
+                    </p>
+                    <button
+                      onClick={() => {
+                        setEditingTask(null);
+                        setIsTaskModalOpen(true);
+                      }}
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-bold shadow-md transition-all active:scale-95"
+                    >
+                      <Icon name="plus" className="w-4 h-4" />
+                      <span>Создать первое ДЗ</span>
+                    </button>
+                  </div>
+                ) : taskViewMode === 'kanban' ? (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {kanbanColumns.map(col => {
+                      const colTasks = filteredTasks.filter(t => t.status === col.id);
+                      return (
+                        <div
+                          key={col.id}
+                          className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-zinc-100/50 dark:bg-zinc-900/40 p-4 backdrop-blur-sm flex flex-col min-h-[500px]"
+                        >
+                          <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-bold text-sm sm:text-base text-zinc-800 dark:text-zinc-200">
+                                {col.title}
+                              </h3>
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${col.badgeColor}`}>
+                                {colTasks.length}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="space-y-3 flex-1 overflow-y-auto">
+                            {colTasks.map(task => (
+                              <div
+                                key={task.id}
+                                className="group relative rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900/90 p-4 shadow-sm hover:shadow-md transition-all hover:border-indigo-500/50"
+                              >
+                                <div className="flex items-start justify-between gap-2 mb-2">
+                                  <span className="text-xs font-bold text-indigo-500 dark:text-indigo-400 bg-indigo-500/10 px-2.5 py-0.5 rounded-md">
+                                    {task.subject}
+                                  </span>
+                                  <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100">
+                                    <button
+                                      onClick={() => {
+                                        setZenTask(task);
+                                        setZenOpen(true);
+                                      }}
+                                      className="p-1 text-zinc-400 hover:text-indigo-400 rounded-md"
+                                      title="Фокус в Дзен-режиме"
+                                    >
+                                      <Icon name="headphones" className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setEditingTask(task);
+                                        setIsTaskModalOpen(true);
+                                      }}
+                                      className="p-1 text-zinc-400 hover:text-amber-400 rounded-md"
+                                      title="Редактировать"
+                                    >
+                                      <Icon name="edit" className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteTask(task.id)}
+                                      className="p-1 text-zinc-400 hover:text-rose-400 rounded-md"
+                                      title="Удалить"
+                                    >
+                                      <Icon name="trash" className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+
+                                <h4 className="font-bold text-sm sm:text-base text-zinc-900 dark:text-zinc-100 mb-1 leading-snug">
+                                  {task.title}
+                                </h4>
+
+                                {task.notes && (
+                                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-3 line-clamp-2">
+                                    {task.notes}
+                                  </p>
+                                )}
+
+                                <div className="flex flex-wrap items-center gap-1.5 mb-3 text-xs">
+                                  {getPriorityBadge(task.priority)}
+                                  <span className="px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 font-medium">
+                                    {task.format}
+                                  </span>
+                                  <span className="px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 font-mono text-[11px]">
+                                    ⏳ {task.estTime}
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center justify-between text-xs text-zinc-400 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                                  <span className="flex items-center gap-1 font-medium">
+                                    <Icon name="clock" className="w-3.5 h-3.5" />
+                                    {task.deadline}
+                                  </span>
+
+                                  <div className="flex items-center gap-1">
+                                    {col.id !== 'todo' && (
+                                      <button
+                                        onClick={() => handleTaskStatusChange(task.id, col.id === 'done' ? 'in_progress' : 'todo')}
+                                        className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-zinc-200 font-bold"
+                                        title="Назад"
+                                      >
+                                        ←
+                                      </button>
+                                    )}
+                                    {col.id !== 'done' && (
+                                      <button
+                                        onClick={() => handleTaskStatusChange(task.id, col.id === 'todo' ? 'in_progress' : 'done')}
+                                        className="p-1.5 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-600 hover:text-white rounded-lg text-indigo-400 transition-colors font-bold"
+                                        title="Вперёд / Сдать"
+                                      >
+                                        →
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+
+                            {colTasks.length === 0 && (
+                              <div className="h-32 flex flex-col items-center justify-center border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl text-zinc-400 text-xs">
+                                Нет заданий в этой колонке
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden shadow-sm">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-sm">
+                        <thead className="bg-zinc-50 dark:bg-zinc-800/50 text-xs font-semibold text-zinc-500 uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800">
+                          <tr>
+                            <th className="px-4 py-3">Статус</th>
+                            <th className="px-4 py-3">Задание</th>
+                            <th className="px-4 py-3">Предмет</th>
+                            <th className="px-4 py-3">Приоритет</th>
+                            <th className="px-4 py-3">Формат</th>
+                            <th className="px-4 py-3">Дедлайн</th>
+                            <th className="px-4 py-3 text-right">Действия</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                          {filteredTasks.map(task => (
+                            <tr key={task.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors">
+                              <td className="px-4 py-3 whitespace-nowrap">
+                                <select
+                                  value={task.status}
+                                  onChange={(e) => handleTaskStatusChange(task.id, e.target.value)}
+                                  className="text-xs rounded-lg px-2.5 py-1 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 font-semibold focus:outline-none"
+                                >
+                                  <option value="todo">К выполнению</option>
+                                  <option value="in_progress">В процессе</option>
+                                  <option value="done">Сдано</option>
+                                </select>
+                              </td>
+                              <td className="px-4 py-3 font-semibold text-zinc-900 dark:text-zinc-100 max-w-xs truncate">
+                                {task.title}
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap text-xs text-indigo-500 font-bold">
+                                {task.subject}
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap">{getPriorityBadge(task.priority)}</td>
+                              <td className="px-4 py-3 whitespace-nowrap text-xs text-zinc-400">{task.format}</td>
+                              <td className="px-4 py-3 whitespace-nowrap text-xs text-zinc-400 font-mono">{task.deadline}</td>
+                              <td className="px-4 py-3 whitespace-nowrap text-right">
+                                <button
+                                  onClick={() => {
+                                    setEditingTask(task);
+                                    setIsTaskModalOpen(true);
+                                  }}
+                                  className="text-zinc-400 hover:text-indigo-400 mr-2"
+                                >
+                                  <Icon name="edit" className="w-4 h-4 inline" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteTask(task.id)}
+                                  className="text-zinc-400 hover:text-rose-400"
+                                >
+                                  <Icon name="trash" className="w-4 h-4 inline" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB 2: SCHEDULE */}
+            {activeTab === 'schedule' && (
+              <div className="space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <h1 className="text-2xl font-black tracking-tight text-zinc-900 dark:text-white">
+                      Расписание уроков
+                    </h1>
+                    <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">
+                      Список уроков на день и кто берёт учебник: Рома или Ермолай
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      setSelectedTextbookDuty('Оба');
+                      setIsClassModalOpen(true);
+                    }}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-bold shadow-md shadow-indigo-600/30 transition-all self-start active:scale-95"
+                  >
+                    <Icon name="plus" className="w-4 h-4" />
+                    <span>Добавить урок</span>
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2 overflow-x-auto pb-2">
+                  {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'].map(day => (
+                    <button
+                      key={day}
+                      onClick={() => setSelectedDay(day)}
+                      className={`px-5 py-2.5 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${
+                        selectedDay === day
+                          ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 scale-105'
+                          : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800'
+                      }`}
+                    >
+                      {day} ({schedule[day]?.length || 0} уроков)
+                    </button>
+                  ))}
+                </div>
+
+                {/* Vertical Schedule Going Downwards */}
+                <div className="flex flex-col gap-3 max-w-3xl">
+                  {(schedule[selectedDay] || []).map((cls, idx) => {
+                    const prevCls = idx > 0 ? (schedule[selectedDay] || [])[idx - 1] : null;
+                    const breakText = getBreakText(cls, prevCls);
+                    const isBigBreak = breakText && breakText.toLowerCase().includes('большая');
+
+                    return (
+                      <React.Fragment key={cls.id}>
+                        {}
+                        {breakText && (
+                          <div className="flex items-center gap-2.5 px-1 py-1 -mb-1">
+                            <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border shadow-xs transition-all ${
+                              isBigBreak
+                                ? 'bg-amber-500/15 text-amber-500 dark:text-amber-400 border-amber-500/30'
+                                : 'bg-zinc-100 dark:bg-zinc-800/90 text-zinc-500 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700/60'
+                            }`}>
+                              <Icon name="coffee" className={`w-3.5 h-3.5 ${isBigBreak ? 'text-amber-500' : 'text-zinc-400'}`} />
+                              <span>{breakText}</span>
+                            </div>
+                            <div className="h-px bg-zinc-200/80 dark:bg-zinc-800 flex-1"></div>
+                          </div>
+                        )}
+
+                        <div
+                          className="relative group rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/80 p-4 sm:p-5 shadow-sm hover:shadow-md transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 overflow-hidden"
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-xl bg-indigo-500/10 dark:bg-indigo-500/20 border border-indigo-500/20 flex flex-col items-center justify-center shrink-0">
+                              <span className="text-[10px] uppercase font-bold text-indigo-400 leading-none">Урок</span>
+                              <span className="text-base font-black text-indigo-600 dark:text-indigo-300 leading-none mt-0.5">{idx + 1}</span>
+                            </div>
+
+                            <div>
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="px-2.5 py-0.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-mono text-xs font-bold flex items-center gap-1.5">
+                                  <Icon name="clock" className="w-3 h-3 text-indigo-400" />
+                                  {cls.time}
+                                </span>
+                              </div>
+                              <h3 className="font-bold text-base sm:text-lg text-zinc-900 dark:text-white leading-snug">
+                                {cls.name}
+                              </h3>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-zinc-100 dark:border-zinc-800">
+                            {getTextbookBadge(cls.textbookDuty)}
+
+                            <button
+                              onClick={() => handleDeleteClass(selectedDay, cls.id)}
+                              className="opacity-70 group-hover:opacity-100 text-zinc-400 hover:text-rose-400 transition-all p-2 rounded-lg hover:bg-rose-500/10"
+                              title="Удалить урок"
+                            >
+                              <Icon name="trash" className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </React.Fragment>
+                    );
+                  })}
+
+                  {(schedule[selectedDay] || []).length === 0 && (
+                    <div className="py-14 flex flex-col items-center justify-center text-zinc-400 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl bg-white/30 dark:bg-zinc-900/30">
+                      <Icon name="coffee" className="w-9 h-9 mb-2 opacity-50 text-indigo-400" />
+                      <p className="font-bold text-sm text-zinc-700 dark:text-zinc-300">В этот день уроков нет</p>
+                      <p className="text-xs text-zinc-400 mt-1">Отличный повод отдохнуть или сделать домашку заранее</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* TAB 3: GRADES & RESOURCES */}
+            {activeTab === 'grades' && (
+              <div className="space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <h1 className="text-2xl font-black tracking-tight text-zinc-900 dark:text-white">
+                      Успеваемость и Банк учебных материалов
+                    </h1>
+                    <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">
+                      Калькулятор среднего балла, расчет пятерок до цели и быстрый доступ к материалам
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => setIsSubjectModalOpen(true)}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-bold shadow-md shadow-indigo-600/30 transition-all self-start active:scale-95"
+                  >
+                    <Icon name="plus" className="w-4 h-4" />
+                    <span>Добавить предмет</span>
+                  </button>
+                </div>
+
+                {subjects.length === 0 ? (
+                  <div className="py-16 flex flex-col items-center justify-center text-center p-6 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl bg-white/40 dark:bg-zinc-900/40">
+                    <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-500 mb-3">
+                      <Icon name="award" className="w-6 h-6" />
+                    </div>
+                    <h4 className="text-base font-bold text-zinc-800 dark:text-zinc-200 mb-1">Предметы пока не добавлены</h4>
+                    <p className="text-xs text-zinc-400 max-w-sm mb-4">
+                      Добавьте дисциплины, чтобы учитывать оценки, рассчитывать нужные пятерки и сохранять ссылки на конспекты.
+                    </p>
+                    <button
+                      onClick={() => setIsSubjectModalOpen(true)}
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-bold shadow-md transition-all active:scale-95"
+                    >
+                      <Icon name="plus" className="w-4 h-4" />
+                      <span>Добавить первый предмет</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {subjects.map(subject => {
+                      const count = subject.grades.length;
+                      const sum = subject.grades.reduce((a, b) => a + b, 0);
+                      const average = count > 0 ? (sum / count).toFixed(2) : '0.00';
+                      const neededFives = calculateNeededFives(subject.grades, subject.targetGrade);
+
+                      return (
+                        <div
+                          key={subject.id}
+                          className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/80 p-5 shadow-sm space-y-4 relative group"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h3 className="font-bold text-lg text-zinc-900 dark:text-white">
+                                  {subject.name}
+                                </h3>
+                                <button
+                                  onClick={() => handleDeleteSubject(subject.id)}
+                                  className="opacity-0 group-hover:opacity-100 text-zinc-400 hover:text-rose-400 transition-all p-1"
+                                  title="Удалить предмет"
+                                >
+                                  <Icon name="trash" className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                              <p className="text-xs text-zinc-400">
+                                Целевой балл: <span className="font-bold text-indigo-400">{subject.targetGrade}</span>
+                              </p>
+                            </div>
+
+                            <div className="text-right">
+                              <div
+                                className={`text-2xl font-black px-3.5 py-1 rounded-xl inline-block ${
+                                  Number(average) >= 4.5
+                                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                    : Number(average) >= 3.75
+                                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                    : count === 0
+                                    ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 border border-zinc-300 dark:border-zinc-700'
+                                    : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                                }`}
+                              >
+                                {average}
+                              </div>
+                              <div className="text-[10px] text-zinc-400 uppercase tracking-wider font-bold mt-1">
+                                Средний балл
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Grade Addition */}
+                          <div>
+                            <div className="text-xs font-semibold text-zinc-400 mb-2 flex items-center justify-between">
+                              <span>Оценки ({count}):</span>
+                              {count > 0 && (
+                                <button
+                                  onClick={() => handleRemoveLastGrade(subject.id)}
+                                  className="text-[11px] text-rose-400 hover:underline"
+                                >
+                                  Удалить последнюю
+                                </button>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {subject.grades.map((g, idx) => (
+                                <span
+                                  key={idx}
+                                  className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs ${
+                                    g === 5
+                                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                      : g === 4
+                                      ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                                      : g === 3
+                                      ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                      : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                                  }`}
+                                >
+                                  {g}
+                                </span>
+                              ))}
+
+                              <div className="flex items-center gap-1 ml-2">
+                                {[5, 4, 3, 2].map(num => (
+                                  <button
+                                    key={num}
+                                    onClick={() => handleAddGrade(subject.id, num)}
+                                    className="px-2 py-1 text-xs rounded-md bg-zinc-100 dark:bg-zinc-800 hover:bg-indigo-600 hover:text-white transition-colors font-bold"
+                                  >
+                                    +{num}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Target Insight */}
+                          <div className="p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-xs flex items-center gap-2.5">
+                            <Icon name="sparkles" className="w-4 h-4 text-indigo-400 shrink-0" />
+                            <div className="text-zinc-300">
+                              {count === 0 ? (
+                                <span className="text-zinc-400">Поставьте первую оценку, чтобы рассчитать путь к цели.</span>
+                              ) : Number(average) >= subject.targetGrade ? (
+                                <span className="text-emerald-400 font-bold">
+                                  Цель достигнута! Отличный результат!
+                                </span>
+                              ) : typeof neededFives === 'number' ? (
+                                <span>
+                                  Нужно получить ещё <strong className="text-white underline">{neededFives}</strong>{' '}
+                                  {neededFives === 1 ? 'пятерку' : neededFives < 5 ? 'пятерки' : 'пятерок'}, чтобы выйти на{' '}
+                                  <strong>{subject.targetGrade}</strong>.
+                                </span>
+                              ) : (
+                                <span>{neededFives}</span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Resource Bank */}
+                          <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-xs font-bold text-zinc-400 flex items-center gap-1.5">
+                                <Icon name="book" className="w-3.5 h-3.5 text-indigo-400" />
+                                Банк учебных ресурсов
+                              </span>
+                              <button
+                                onClick={() => {
+                                  const title = prompt('Название ресурса (например: Конспекты лекций):');
+                                  const url = prompt('Ссылка (URL):');
+                                  if (title && url) handleAddResource(subject.id, title, url);
+                                }}
+                                className="text-[11px] text-indigo-400 hover:underline flex items-center gap-1 font-semibold"
+                              >
+                                <Icon name="plus" className="w-3 h-3" /> Добавить
+                              </button>
+                            </div>
+
+                            <div className="space-y-1.5">
+                              {subject.resources.map(res => (
+                                <a
+                                  key={res.id}
+                                  href={res.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center justify-between p-2 rounded-lg bg-zinc-100/70 dark:bg-zinc-800/50 hover:bg-indigo-500/10 transition-colors text-xs text-zinc-700 dark:text-zinc-300"
+                                >
+                                  <span className="truncate pr-2 font-medium">{res.title}</span>
+                                  <Icon name="external" className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                                </a>
+                              ))}
+                              {subject.resources.length === 0 && (
+                                <span className="text-[11px] text-zinc-400 italic">Ссылки на диски и конспекты пока не добавлены</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB 4: ACTIVITY & PRODUCTIVITY (MOVED TO THE LAST TAB) */}
+            {activeTab === 'analytics' && (
+              <div className="space-y-6">
+                
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h1 className="text-2xl font-black tracking-tight text-zinc-900 dark:text-white">
+                        Активность и продуктивность
+                      </h1>
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                        Live Sync
+                      </span>
+                    </div>
+                    <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">
+                      Сетка выполненных заданий в стиле коммитов GitHub, непрерывные стрики и история продуктивности
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => setSelectedDateForDetails(toDateKey(new Date()))}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-bold shadow-md shadow-emerald-600/30 transition-all self-start active:scale-95"
+                  >
+                    <Icon name="plus" className="w-4 h-4" />
+                    <span>Добавить активность за сегодня</span>
+                  </button>
+                </div>
+
+                {/* Metric Summary Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  
+                  <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900/80 p-5 shadow-sm">
+                    <div className="flex items-center justify-between text-zinc-400 text-xs font-bold uppercase tracking-wider mb-2">
+                      <span>Текущий стрик</span>
+                      <Icon name="flame" className="w-4 h-4 text-amber-500" />
+                    </div>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-3xl sm:text-4xl font-black text-amber-500">
+                        {productivityStats.currentStreak}
+                      </span>
+                      <span className="text-sm font-bold text-zinc-400">дней подряд</span>
+                    </div>
+                    <p className="text-xs text-zinc-500 mt-2">
+                      {productivityStats.currentStreak >= 1 ? '🔥 Прекрасный темп! Цепочка не прерывается!' : '⚡ Выполните задачу сегодня, чтобы начать стрик!'}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900/80 p-5 shadow-sm">
+                    <div className="flex items-center justify-between text-zinc-400 text-xs font-bold uppercase tracking-wider mb-2">
+                      <span>Рекордный стрик</span>
+                      <Icon name="award" className="w-4 h-4 text-indigo-400" />
+                    </div>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-3xl sm:text-4xl font-black text-indigo-500">
+                        {productivityStats.recordStreak}
+                      </span>
+                      <span className="text-sm font-bold text-zinc-400">дней макс.</span>
+                    </div>
+                    <p className="text-xs text-zinc-500 mt-2">
+                      Лучший личный результат за всё время
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900/80 p-5 shadow-sm">
+                    <div className="flex items-center justify-between text-zinc-400 text-xs font-bold uppercase tracking-wider mb-2">
+                      <span>Закрыто на неделе</span>
+                      <Icon name="checkCircle" className="w-4 h-4 text-emerald-500" />
+                    </div>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-3xl sm:text-4xl font-black text-emerald-500">
+                        {productivityStats.thisWeekCount}
+                      </span>
+                      <span className="text-xs font-semibold text-zinc-400">/ {productivityStats.totalAllTime} всего</span>
+                    </div>
+                    <p className="text-xs text-zinc-500 mt-2">
+                      Задач и учебных блоков выполнено
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900/80 p-5 shadow-sm">
+                    <div className="flex items-center justify-between text-zinc-400 text-xs font-bold uppercase tracking-wider mb-2">
+                      <span>Пиковый день</span>
+                      <Icon name="zap" className="w-4 h-4 text-cyan-400" />
+                    </div>
+                    <div className="text-base sm:text-lg font-black text-zinc-900 dark:text-white truncate">
+                      {productivityStats.bestDayText.split(' ')[0]}
+                    </div>
+                    <p className="text-xs text-zinc-500 mt-2">
+                      Самая высокая концентрация и продуктивность
+                    </p>
+                  </div>
+                </div>
+
+                {/* 18-Week Interactive Heatmap */}
+                <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900/80 p-6 shadow-sm space-y-4">
+                  
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-zinc-100 dark:border-zinc-800/80">
+                    <div className="flex items-center gap-2">
+                      <Icon name="barChart" className="w-5 h-5 text-emerald-500" />
+                      <h3 className="font-bold text-base text-zinc-900 dark:text-zinc-100">
+                        Карта учебной активности за 18 недель
+                      </h3>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-xs text-zinc-500 font-medium">
+                      <span>Меньше</span>
+                      <div className="flex items-center gap-1">
+                        <span className="w-3 h-3 rounded-sm bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/40" title="0 заданий" />
+                        <span className="w-3 h-3 rounded-sm bg-emerald-300 dark:bg-emerald-900 border border-emerald-400 dark:border-emerald-700" title="1 задание" />
+                        <span className="w-3 h-3 rounded-sm bg-emerald-400 dark:bg-emerald-700 border border-emerald-500" title="2 задания" />
+                        <span className="w-3 h-3 rounded-sm bg-emerald-500 dark:bg-emerald-500" title="3 задания" />
+                        <span className="w-3 h-3 rounded-sm bg-emerald-400 dark:bg-emerald-400 border border-emerald-200 shadow-sm shadow-emerald-400/50" title="4+ задания" />
+                      </div>
+                      <span>Больше</span>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto pb-3">
+                    <div className="min-w-[760px] select-none">
+                      
+                      {/* Month Headers */}
+                      <div className="flex text-[11px] font-semibold text-zinc-400 pl-7 mb-1.5 h-4">
+                        {heatmapData.weeks.map((_, idx) => {
+                          const header = heatmapData.monthHeaders.find(h => h.weekIndex === idx);
+                          return (
+                            <div key={idx} className="w-3.5 mr-1.5 shrink-0 text-left">
+                              {header ? header.title : ''}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Day Columns */}
+                      <div className="flex">
+                        <div className="flex flex-col justify-between text-[10px] font-bold text-zinc-400 pr-2 h-[105px] py-0.5">
+                          <span>Пн</span>
+                          <span>Ср</span>
+                          <span>Пт</span>
+                        </div>
+
+                        <div className="flex gap-1.5">
+                          {heatmapData.weeks.map((week, wIdx) => (
+                            <div key={wIdx} className="flex flex-col gap-1.5">
+                              {week.map((dayItem) => {
+                                const { dateKey, count, isFuture, isToday } = dayItem;
+                                return (
+                                  <button
+                                    key={dateKey}
+                                    disabled={isFuture}
+                                    onClick={() => !isFuture && setSelectedDateForDetails(dateKey)}
+                                    className={`w-3.5 h-3.5 rounded-sm transition-all duration-200 relative group ${getCellColor(
+                                      count,
+                                      isFuture,
+                                      isToday
+                                    )}`}
+                                  >
+                                    {!isFuture && (
+                                      <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:flex flex-col items-center z-30">
+                                        <div className="px-2.5 py-1.5 rounded-lg bg-zinc-900 text-white text-[11px] font-medium shadow-xl whitespace-nowrap border border-zinc-700">
+                                          <div className="font-bold text-emerald-400">
+                                            {count === 0 ? 'Нет активности' : `${count} ${count === 1 ? 'задача' : count < 5 ? 'задачи' : 'задач'}`}
+                                          </div>
+                                          <div className="text-zinc-400 text-[10px]">{formatDateRu(dateKey)}</div>
+                                        </div>
+                                        <div className="w-2 h-2 -mt-1 rotate-45 bg-zinc-900 border-r border-b border-zinc-700" />
+                                      </div>
+                                    )}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 text-xs text-zinc-500">
+                    <div className="flex items-center gap-1.5">
+                      <Icon name="info" className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>Кликните на любой квадратик, чтобы посмотреть историю дня или добавить активность.</span>
+                    </div>
+                    <div className="font-medium text-emerald-500">
+                      Сегодня: {activityLog[toDateKey(new Date())]?.count || 0} задач закрыто
+                    </div>
+                  </div>
+                </div>
+
+                {/* History Log */}
+                <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900/80 p-5 shadow-sm space-y-4">
+                  <h3 className="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                    <Icon name="calendar" className="w-4 h-4 text-indigo-400" />
+                    Лента недавних достижений
+                  </h3>
+
+                  {Object.keys(activityLog).length === 0 ? (
+                    <div className="py-8 text-center text-xs text-zinc-400">
+                      История активности пуста. Закрывайте домашние задания или вносите дела вручную!
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                      {Object.entries(activityLog)
+                        .sort(([a], [b]) => b.localeCompare(a))
+                        .slice(0, 5)
+                        .map(([dKey, data]) => (
+                          <div key={dKey} className="py-3 flex items-start justify-between gap-4">
+                            <div>
+                              <div className="text-xs font-bold text-indigo-500 dark:text-indigo-400">
+                                {formatDateFullRu(dKey)}
+                              </div>
+                              <div className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 mt-0.5">
+                                Закрыто: {data.count} {data.count === 1 ? 'действие' : 'действия'}
+                              </div>
+                              <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                {data.items.slice(0, 3).map(item => (
+                                  <span
+                                    key={item.id}
+                                    className="px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 text-xs font-medium"
+                                  >
+                                    ✓ {item.title}
+                                  </span>
+                                ))}
+                                {data.items.length > 3 && (
+                                  <span className="text-xs text-zinc-400 self-center">
+                                    +{data.items.length - 3} ещё
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <button
+                              onClick={() => setSelectedDateForDetails(dKey)}
+                              className="text-xs font-semibold text-indigo-500 hover:text-indigo-400 shrink-0 self-center"
+                            >
+                              Подробнее →
+                            </button>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </main>
+
+          {/* DAY DETAILS & MANUAL ACTIVITY MODAL */}
+          {selectedDateForDetails && (
+            <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+                
+                <div className="flex items-start justify-between">
+                  <div>
+                    <span className="text-xs font-bold text-emerald-500 uppercase tracking-wider">Карточка дня</span>
+                    <h3 className="font-bold text-lg text-zinc-900 dark:text-white capitalize">
+                      {formatDateFullRu(selectedDateForDetails)}
+                    </h3>
+                  </div>
+                  <button
+                    onClick={() => setSelectedDateForDetails(null)}
+                    className="text-zinc-400 hover:text-zinc-200 p-1 rounded-lg"
+                  >
+                    <Icon name="x" className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="p-3 rounded-xl bg-zinc-100 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/60 flex items-center justify-between">
+                  <span className="text-xs text-zinc-500 dark:text-zinc-400">Закрыто задач и дел:</span>
+                  <span className="text-base font-extrabold text-emerald-400">
+                    {activityLog[selectedDateForDetails]?.count || 0}
+                  </span>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-zinc-400">Записать выполненную активность:</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Например: Чтение конспекта 40 мин"
+                      value={manualActivityTitle}
+                      onChange={(e) => setManualActivityTitle(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleAddManualActivity(selectedDateForDetails)}
+                      className="flex-1 px-3 py-2 text-xs rounded-xl border border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                    <button
+                      onClick={() => handleAddManualActivity(selectedDateForDetails)}
+                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shrink-0 transition-all"
+                    >
+                      +1 Зачесть
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <span className="text-xs font-bold text-zinc-400">Список дел за этот день:</span>
+                  <div className="max-h-56 overflow-y-auto space-y-1.5 pr-1">
+                    {(activityLog[selectedDateForDetails]?.items || []).map(item => (
+                      <div
+                        key={item.id}
+                        className="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-800 flex items-center justify-between text-xs"
+                      >
+                        <div className="flex items-center gap-2 overflow-hidden">
+                          <span className="text-emerald-500 font-bold">✓</span>
+                          <span className="font-semibold text-zinc-800 dark:text-zinc-200 truncate">{item.title}</span>
+                          <span className="text-[10px] text-zinc-400 font-mono">({item.time})</span>
+                        </div>
+                        <button
+                          onClick={() => handleDeleteActivityItem(selectedDateForDetails, item.id)}
+                          className="text-zinc-400 hover:text-rose-400 shrink-0 ml-2"
+                          title="Удалить запись"
+                        >
+                          <Icon name="trash" className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+
+                    {(!activityLog[selectedDateForDetails] || activityLog[selectedDateForDetails].items.length === 0) && (
+                      <div className="py-6 text-center text-xs text-zinc-400 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl">
+                        В этот день записей пока нет
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="pt-2 flex justify-end">
+                  <button
+                    onClick={() => setSelectedDateForDetails(null)}
+                    className="px-4 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-bold hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                  >
+                    Закрыть
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ZEN POMODORO FULLSCREEN MODE */}
+          {zenOpen && (
+            <div className="fixed inset-0 z-50 bg-[#08090d]/95 backdrop-blur-2xl text-white flex flex-col justify-between p-6 sm:p-12">
+              
+              <div className="flex items-center justify-between max-w-4xl w-full mx-auto">
+                <div className="flex items-center gap-2 text-indigo-400 font-bold tracking-wider uppercase text-xs">
+                  <Icon name="headphones" className="w-4 h-4 animate-pulse" />
+                  <span>Дзен-режим глубокой концентрации</span>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={toggleAmbientSound}
+                    className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl border text-xs font-bold transition-all ${
+                      ambientSound
+                        ? 'bg-indigo-600/30 border-indigo-500 text-indigo-300 shadow-lg shadow-indigo-500/20'
+                        : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white'
+                    }`}
+                  >
+                    {ambientSound ? <Icon name="volume" className="w-4 h-4 text-indigo-400" /> : <Icon name="volumeX" className="w-4 h-4" />}
+                    <span>Шум дождя (генератор)</span>
+                  </button>
+
+                  <button
+                    onClick={() => setZenOpen(false)}
+                    className="p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white"
+                    title="Выйти"
+                  >
+                    <Icon name="x" className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex flex-col items-center justify-center max-w-lg w-full mx-auto text-center space-y-8 my-auto">
+                
+                <div className="space-y-2 w-full">
+                  <span className="text-xs text-zinc-500 font-bold uppercase tracking-wider">Фокус на задании:</span>
+                  <select
+                    value={zenTask?.id || ''}
+                    onChange={(e) => {
+                      const t = tasks.find(x => x.id === e.target.value);
+                      setZenTask(t);
+                    }}
+                    className="w-full text-center px-4 py-2.5 rounded-xl bg-zinc-900/80 border border-zinc-800 text-sm font-semibold text-zinc-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    {tasks.length === 0 ? (
+                      <option value="">(Заданий пока нет — свободный фокус)</option>
+                    ) : (
+                      tasks.map(t => (
+                        <option key={t.id} value={t.id}>
+                          {t.subject} — {t.title}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+
+                <div className="relative">
+                  <div className="text-7xl sm:text-9xl font-black font-mono tracking-tight bg-gradient-to-b from-white via-zinc-200 to-zinc-500 bg-clip-text text-transparent select-none">
+                    {formatTimer(pomodoroTime)}
+                  </div>
+                  <div className="text-xs uppercase tracking-widest text-indigo-400 font-bold mt-2">
+                    {timerMode === 'work' ? 'Рабочий спринт (25 мин)' : 'Короткий отдых (5 мин)'}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={() => setIsTimerRunning(!isTimerRunning)}
+                    className="w-16 h-16 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center shadow-lg shadow-indigo-600/30 transition-transform active:scale-95"
+                  >
+                    {isTimerRunning ? <Icon name="pause" className="w-7 h-7" /> : <Icon name="play" className="w-7 h-7 ml-1" />}
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setIsTimerRunning(false);
+                      setPomodoroTime(timerMode === 'work' ? 25 * 60 : 5 * 60);
+                    }}
+                    className="w-12 h-12 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-white flex items-center justify-center transition-all"
+                    title="Сброс"
+                  >
+                    <Icon name="rotate" className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {zenTask && zenTask.status !== 'done' && (
+                  <button
+                    onClick={() => {
+                      handleTaskStatusChange(zenTask.id, 'done');
+                      setZenOpen(false);
+                    }}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/30 text-xs font-bold transition-all"
+                  >
+                    <Icon name="check" className="w-4 h-4" /> Отметить задание как выполненное
+                  </button>
+                )}
+              </div>
+
+              <div className="text-center text-xs text-zinc-600">
+                «Регулярность коммитов и небольшие ежедневные шаги приводят к выдающимся результатам.»
+              </div>
+            </div>
+          )}
+
+          {/* TASK MODAL */}
+          {isTaskModalOpen && (
+            <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-lg text-zinc-900 dark:text-white">
+                    {editingTask ? 'Редактировать задание' : 'Новое домашнее задание'}
+                  </h3>
+                  <button
+                    onClick={() => {
+                      setIsTaskModalOpen(false);
+                      setEditingTask(null);
+                    }}
+                    className="text-zinc-400 hover:text-zinc-200"
+                  >
+                    <Icon name="x" className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const formData = new FormData(e.target);
+                    handleSaveTask({
+                      title: formData.get('title'),
+                      subject: formData.get('subject'),
+                      deadline: formData.get('deadline'),
+                      priority: formData.get('priority'),
+                      format: formData.get('format'),
+                      estTime: formData.get('estTime') || '~30 мин',
+                      notes: formData.get('notes'),
+                      status: editingTask ? editingTask.status : 'todo'
+                    });
+                  }}
+                  className="space-y-3"
+                >
+                  <div>
+                    <label className="text-xs font-bold text-zinc-400">Название задания *</label>
+                    <input
+                      name="title"
+                      required
+                      defaultValue={editingTask?.title || ''}
+                      placeholder="Например: Решить вариант 4, задачи 1-5"
+                      className="w-full mt-1 px-3 py-2 text-sm rounded-xl border border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-zinc-400">Предмет *</label>
+                    <input
+                      name="subject"
+                      required
+                      defaultValue={editingTask?.subject || ''}
+                      placeholder="Например: Математический анализ"
+                      className="w-full mt-1 px-3 py-2 text-sm rounded-xl border border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-bold text-zinc-400">Дедлайн *</label>
+                      <input
+                        type="date"
+                        name="deadline"
+                        required
+                        defaultValue={editingTask?.deadline || toDateKey(new Date())}
+                        className="w-full mt-1 px-3 py-2 text-sm rounded-xl border border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-zinc-400">Приоритет</label>
+                      <select
+                        name="priority"
+                        defaultValue={editingTask?.priority || 'medium'}
+                        className="w-full mt-1 px-3 py-2 text-sm rounded-xl border border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      >
+                        <option value="high">🔥 Высокий</option>
+                        <option value="medium">⚡ Средний</option>
+                        <option value="low">☕ Низкий</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-bold text-zinc-400">Формат сдачи</label>
+                      <select
+                        name="format"
+                        defaultValue={editingTask?.format || '#тетрадь'}
+                        className="w-full mt-1 px-3 py-2 text-sm rounded-xl border border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      >
+                        <option value="#тетрадь">#тетрадь</option>
+                        <option value="#лаба">#лаба</option>
+                        <option value="#презентация">#презентация</option>
+                        <option value="#тест">#тест</option>
+                        <option value="#эссе">#эссе</option>
+                        <option value="#электронно">#электронно</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-zinc-400">Время (~)</label>
+                      <input
+                        name="estTime"
+                        defaultValue={editingTask?.estTime || '~45 мин'}
+                        placeholder="~30 мин, 1.5 ч"
+                        className="w-full mt-1 px-3 py-2 text-sm rounded-xl border border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-zinc-400">Заметки / Указания</label>
+                    <textarea
+                      name="notes"
+                      rows={2}
+                      defaultValue={editingTask?.notes || ''}
+                      placeholder="Дополнительные комментарии..."
+                      className="w-full mt-1 px-3 py-2 text-sm rounded-xl border border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  <div className="pt-2 flex items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsTaskModalOpen(false);
+                        setEditingTask(null);
+                      }}
+                      className="px-4 py-2 rounded-xl text-sm font-semibold text-zinc-400 hover:text-zinc-200"
+                    >
+                      Отмена
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold shadow-md shadow-indigo-600/30"
+                    >
+                      {editingTask ? 'Сохранить' : 'Добавить'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* SCHEDULE CLASS MODAL */}
+          {isClassModalOpen && (
+            <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-lg text-zinc-900 dark:text-white">
+                    Новый урок ({selectedDay})
+                  </h3>
+                  <button onClick={() => setIsClassModalOpen(false)} className="text-zinc-400 hover:text-zinc-200">
+                    <Icon name="x" className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const formData = new FormData(e.target);
+                    handleAddClass({
+                      name: formData.get('name'),
+                      time: formData.get('time'),
+                      breakType: formData.get('breakType') || 'auto',
+                      textbookDuty: selectedTextbookDuty
+                    });
+                  }}
+                  className="space-y-4"
+                >
+                  <div>
+                    <label className="text-xs font-bold text-zinc-400">Название предмета / урока *</label>
+                    <input
+                      name="name"
+                      required
+                      placeholder="Например: Алгебра, Русский язык, Физика"
+                      className="w-full mt-1.5 px-3 py-2 text-sm rounded-xl border border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-zinc-400">Время урока *</label>
+                    <input
+                      name="time"
+                      required
+                      defaultValue="08:30 - 09:15"
+                      placeholder="08:30 - 09:15"
+                      className="w-full mt-1.5 px-3 py-2 text-sm rounded-xl border border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-zinc-400">Перемена перед этим уроком</label>
+                    <select
+                      name="breakType"
+                      defaultValue="auto"
+                      className="w-full mt-1.5 px-3 py-2 text-sm rounded-xl border border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="auto">⚡ Автоматически по времени уроков</option>
+                      <option value="Маленькая перемена: 10 мин">Маленькая перемена: 10 мин</option>
+                      <option value="Большая перемена: 20 мин">Большая перемена: 20 мин</option>
+                      <option value="Маленькая перемена: 15 мин">Маленькая перемена: 15 мин</option>
+                      <option value="Большая перемена: 25 мин">Большая перемена: 25 мин</option>
+                      <option value="none">Без перемены (первый урок)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-xs font-bold text-zinc-400">Кто берёт учебник? *</label>
+                      <span className="text-[11px] font-semibold text-indigo-400">
+                        Выбрано: <span className="font-bold underline">{selectedTextbookDuty}</span>
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-1.5">
+                      {[
+                        {
+                          id: 'Рома',
+                          label: 'Рома',
+                          activeClass: 'border-sky-500 bg-sky-500/20 text-sky-600 dark:text-sky-300 ring-2 ring-sky-500/40 shadow-md shadow-sky-500/20 scale-[1.03]',
+                          dotClass: 'bg-sky-400'
+                        },
+                        {
+                          id: 'Ермолай',
+                          label: 'Ермолай',
+                          activeClass: 'border-amber-500 bg-amber-500/20 text-amber-600 dark:text-amber-300 ring-2 ring-amber-500/40 shadow-md shadow-amber-500/20 scale-[1.03]',
+                          dotClass: 'bg-amber-400'
+                        },
+                        {
+                          id: 'Оба',
+                          label: 'Оба',
+                          activeClass: 'border-violet-500 bg-violet-500/20 text-violet-600 dark:text-violet-300 ring-2 ring-violet-500/40 shadow-md shadow-violet-500/20 scale-[1.03]',
+                          dotClass: 'bg-violet-400'
+                        },
+                        {
+                          id: 'Без учебника',
+                          label: 'Без учебника',
+                          activeClass: 'border-zinc-500 dark:border-zinc-400 bg-zinc-200 dark:bg-zinc-700/80 text-zinc-900 dark:text-zinc-100 ring-2 ring-zinc-500/40 shadow-md scale-[1.03]',
+                          dotClass: 'bg-zinc-400'
+                        }
+                      ].map((item) => {
+                        const isSelected = selectedTextbookDuty === item.id;
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => setSelectedTextbookDuty(item.id)}
+                            className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl border font-bold text-xs transition-all duration-200 cursor-pointer select-none text-center ${
+                              isSelected
+                                ? item.activeClass
+                                : 'border-zinc-200 dark:border-zinc-700/70 bg-zinc-50 dark:bg-zinc-800/60 text-zinc-600 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 opacity-80 hover:opacity-100'
+                            }`}
+                          >
+                            <span className="flex items-center gap-1.5">
+                              {isSelected ? (
+                                <span className={`w-2 h-2 rounded-full ${item.dotClass} animate-pulse`} />
+                              ) : (
+                                <span className="w-2 h-2 rounded-full border border-zinc-400 dark:border-zinc-600" />
+                              )}
+                              <span>{item.label}</span>
+                            </span>
+                            {isSelected && (
+                              <span className="text-[10px] font-semibold opacity-90 leading-none">
+                                ✓ выбрано
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="pt-2 flex items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsClassModalOpen(false)}
+                      className="px-4 py-2 rounded-xl text-sm font-semibold text-zinc-400 hover:text-zinc-200"
+                    >
+                      Отмена
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold shadow-md shadow-indigo-600/30"
+                    >
+                      Добавить урок
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* SUBJECT MODAL */}
+          {isSubjectModalOpen && (
+            <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-lg text-zinc-900 dark:text-white">
+                    Новый учебный предмет
+                  </h3>
+                  <button onClick={() => setIsSubjectModalOpen(false)} className="text-zinc-400 hover:text-zinc-200">
+                    <Icon name="x" className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const formData = new FormData(e.target);
+                    handleAddSubject({
+                      name: formData.get('name'),
+                      targetGrade: formData.get('targetGrade')
+                    });
+                  }}
+                  className="space-y-3"
+                >
+                  <div>
+                    <label className="text-xs font-bold text-zinc-400">Название предмета *</label>
+                    <input
+                      name="name"
+                      required
+                      placeholder="Например: Математический анализ, Английский"
+                      className="w-full mt-1 px-3 py-2 text-sm rounded-xl border border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-zinc-400">Желаемый средний балл (цель)</label>
+                    <input
+                      name="targetGrade"
+                      type="number"
+                      step="0.05"
+                      min="2.0"
+                      max="5.0"
+                      defaultValue="4.75"
+                      className="w-full mt-1 px-3 py-2 text-sm rounded-xl border border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  <div className="pt-2 flex items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsSubjectModalOpen(false)}
+                      className="px-4 py-2 rounded-xl text-sm font-semibold text-zinc-400 hover:text-zinc-200"
+                    >
+                      Отмена
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold shadow-md shadow-indigo-600/30"
+                    >
+                      Добавить
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
